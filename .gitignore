@@ -1,0 +1,12 @@
+# Label CSVs and captures are data, not code
+*.csv
+*.pcap
+*.pcapng
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
