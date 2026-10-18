@@ -136,6 +136,22 @@ timestamp,src_ip,tcp src_port,dst_ip,ip dst,tcp dst port,udp dst port,protocol,c
 | `src_ip`, `ip dst` (or `ip src`, `dst_ip`, `ip.src`, `ip.dst`) | Recommended. Tell apart packets that share the same microsecond. Values that are not IP addresses are ignored |
 | `protocol` | Used only for rows without IP addresses, such as ARP |
 | `class` | Used only with `--by-class` |
+| `note` (or `comment`) | Optional. Text shown on the packet (see below) |
+
+### Notes
+
+When the CSV has a `note` column, each labeled packet shows its note under the label in the packet details:
+
+```
+Packet Label: poison-out_of_range
+    Label: poison-out_of_range
+        Note: TMP120.PV=58.3 out_of_range (allowed 18.1..22.9)
+```
+
+- Filter on it: `pcaplabel.note contains "TMP120"`.
+- See it next to every packet: right-click the *Note* line and choose *Apply as Column*.
+- Several rows for the same packet in one label are merged into one note, separated by ` | `.
+- Tabs and line breaks in a note are replaced by spaces. Label files from CSVs without notes are unchanged.
 
 Frame numbers are not used, because they restart at 1 in every split file.
 

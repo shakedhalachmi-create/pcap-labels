@@ -66,11 +66,29 @@ def test_rows_to_marks_uses_real_ip_columns(tmp_path):
         "garbage,,,,,,,ARP,1,"))
     marks, dates, skipped = cr.rows_to_marks(rows, cols, cr.parse_timezone("UTC+3"), date(2023, 6, 19))
     assert marks == {
-        (1687166158769286, "MDNS", "192.0.2.10", "224.0.0.251"),
-        (1687166158387265, "ARP", "", ""),
+        (1687166158769286, "MDNS", "192.0.2.10", "224.0.0.251", ""),
+        (1687166158387265, "ARP", "", "", ""),
     }
     assert dates == {date(2023, 6, 19)}
     assert skipped == 1
+
+
+def test_note_column_is_read_and_merged_per_packet(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text(
+        "timestamp,src_ip,dst_ip,protocol,note\n"
+        "2023-06-19T12:00:00.000001+0300,192.0.2.1,192.0.2.2,S7COMM,TMP120.PV=58 out_of_range\n"
+        "2023-06-19T12:00:00.000001+0300,192.0.2.1,192.0.2.2,S7COMM,\"VLV301.Ack\tnew\n value\"\n"
+        "2023-06-19T12:00:00.000001+0300,192.0.2.1,192.0.2.2,S7COMM,TMP120.PV=58 out_of_range\n"
+        "2023-06-19T12:00:01.000000+0300,192.0.2.1,192.0.2.2,S7COMM,\n",
+        encoding="utf-8")
+    rows, cols = cr.read_rows(path)
+    marks, _, _ = cr.rows_to_marks(rows, cols, cr.parse_timezone("UTC+3"))
+    assert marks == {
+        (1687165200000001, "S7COMM", "192.0.2.1", "192.0.2.2",
+         "TMP120.PV=58 out_of_range | VLV301.Ack new value"),   # one mark, no tabs or newlines
+        (1687165201000000, "S7COMM", "192.0.2.1", "192.0.2.2", ""),
+    }
 
 
 def test_missing_date_is_an_error(tmp_path):

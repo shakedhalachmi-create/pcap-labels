@@ -126,8 +126,10 @@ def write_label_file(paths, label, color_hex, dates, source, tz_name, marks):
         f.write(f"# date: {', '.join(d.isoformat() for d in sorted(dates))}\n")
         f.write(f"# timezone: {tz_name}\n")
         f.write(f"# source: {source}\n")
-        f.write("# columns: epoch_us<TAB>protocol<TAB>src_ip<TAB>dst_ip\n")
-        f.writelines("\t".join(map(str, m)) + "\n" for m in sorted(marks))
+        f.write("# columns: epoch_us<TAB>protocol<TAB>src_ip<TAB>dst_ip<TAB>note\n")
+        # the note column is written only when there is a note, so files without notes are unchanged
+        f.writelines("\t".join(map(str, m[:4])) + (f"\t{m[4]}" if len(m) > 4 and m[4] else "") + "\n"
+                     for m in sorted(marks))
 
 
 def read_label_files(paths):

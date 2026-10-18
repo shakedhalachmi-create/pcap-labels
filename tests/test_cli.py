@@ -110,6 +110,17 @@ def test_color_conflict_interactive_change_color(env, monkeypatch):
     assert len(rule_lines(paths)) == 4
 
 
+def test_note_column_written_to_label_file(env, tmp_path):
+    paths, _ = env
+    csv = tmp_path / "notes.csv"
+    csv.write_text("timestamp,src_ip,dst_ip,protocol,note\n"
+                   "2023-06-19T12:00:00.000001+0300,192.0.2.1,192.0.2.2,S7COMM,TMP120.PV=58 out_of_range\n",
+                   encoding="utf-8")
+    assert add(csv, "--name", "poison", "--color", "red") == 0
+    lines = paths.label_file("poison").read_text(encoding="utf-8").splitlines()
+    assert "1687165200000001\tS7COMM\t192.0.2.1\t192.0.2.2\tTMP120.PV=58 out_of_range" in lines
+
+
 def test_by_class_makes_one_label_per_value(env):
     paths, csv = env
     assert add(csv, "--name", "traffic", "--color", "green,red", "--by-class") == 0

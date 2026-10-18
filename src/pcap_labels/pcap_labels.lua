@@ -5,7 +5,9 @@
 --
 -- Label files (<name>.tsv) are written by the `pcap-labels add` command into the
 -- folder "pcap_labels_data" next to this file. Each line identifies one packet:
---     epoch_microseconds <TAB> protocol <TAB> src_ip <TAB> dst_ip
+--     epoch_microseconds <TAB> protocol <TAB> src_ip <TAB> dst_ip [<TAB> note]
+-- The optional note is shown under the label as  pcaplabel.note  (filterable, and
+-- usable as a column). Older label files without it still load.
 -- Packets are identified by absolute time, not frame number, so labels keep working
 -- on files split from a larger capture, and only match packets of their own day.
 -- Several packets can share one microsecond, so a second check tells them apart:
@@ -17,7 +19,8 @@
 
 local pcaplabel = Proto("pcaplabel", "Packet Label")
 local f_name = ProtoField.string("pcaplabel.name", "Label")
-pcaplabel.fields = { f_name }
+local f_note = ProtoField.string("pcaplabel.note", "Note")
+pcaplabel.fields = { f_name, f_note }
 
 pcaplabel.prefs.enabled = Pref.bool("Enabled", true, "Show labels from the pcap-labels data folder")
 
@@ -60,7 +63,7 @@ local function proto_matches(proto, chain)
     return (":" .. chain .. ":"):find(":" .. want .. ":", 1, true) ~= nil
 end
 
-local marks = {}  -- epoch_us -> list of { label, proto, src, dst }
+local marks = {}  -- epoch_us -> list of { label, proto, src, dst, note }
 
 local function load_label_file(path, default_name)
     local fh = io.open(path, "r")
@@ -71,12 +74,13 @@ local function load_label_file(path, default_name)
         if header_name and header_name ~= "" then
             label = header_name
         elseif not line:match("^%s*#") then
-            local us, proto, src, dst = line:match("^(%d+)\t?([^\t]*)\t?([^\t]*)\t?([^\t\r]*)")
+            local us, proto, src, dst, note =
+                line:match("^(%d+)\t?([^\t]*)\t?([^\t]*)\t?([^\t\r]*)\t?([^\r]*)")
             us = us and tonumber(us)
             if us then
                 local list = marks[us]
                 if not list then list = {}; marks[us] = list end
-                list[#list + 1] = { label = label, proto = proto, src = src, dst = dst }
+                list[#list + 1] = { label = label, proto = proto, src = src, dst = dst, note = note or "" }
             end
         end
     end
@@ -125,7 +129,8 @@ function pcaplabel.dissector(tvb, pinfo, tree)
                 seen[e.label] = true
                 count = count + 1
                 subtree = subtree or tree:add(pcaplabel, tvb())
-                subtree:add(f_name, e.label)
+                local item = subtree:add(f_name, e.label)
+                if e.note ~= "" then item:add(f_note, e.note) end
                 subtree:append_text((count == 1 and ": " or ", ") .. e.label)
             end
         end

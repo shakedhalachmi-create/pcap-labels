@@ -23,6 +23,7 @@ TIME_COLS = ("timestamp", "time", "frame.time")
 SRC_COLS = ("src_ip", "ip src", "ip.src", "source")
 DST_COLS = ("ip dst", "dst_ip", "ip.dst", "destination")
 PROTO_COLS = ("protocol",)
+NOTE_COLS = ("note", "comment")
 
 _TIME_RE = re.compile(r"(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?")
 _ISO_DATE_RE = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})")
@@ -132,13 +133,15 @@ def rows_to_marks(rows, columns, tz, default_date=None):
     """Convert CSV rows to a set of marks.
 
     Returns (marks, dates, skipped): marks is a set of
-    (epoch_us, protocol, src_ip, dst_ip); dates is the set of capture dates seen;
-    skipped counts rows whose time could not be read.
+    (epoch_us, protocol, src_ip, dst_ip, note); dates is the set of capture dates seen;
+    skipped counts rows whose time could not be read. The note comes from an optional
+    "note" / "comment" column; notes of rows for the same packet are joined with " | ".
     """
     time_col = find_column(columns, TIME_COLS)
     if not time_col:
         raise CsvError(f"The CSV has no time column (expected one of: {', '.join(TIME_COLS)}).")
     proto_col = find_column(columns, PROTO_COLS)
+    note_col = find_column(columns, NOTE_COLS)
     src_cols = [columns[c] for c in SRC_COLS if c in columns]
     dst_cols = [columns[c] for c in DST_COLS if c in columns]
 
@@ -151,7 +154,7 @@ def rows_to_marks(rows, columns, tz, default_date=None):
             offsets[key] = int(local.utcoffset().total_seconds()) * 10**6
         return offsets[key]
 
-    marks, dates, skipped = set(), set(), 0
+    notes, dates, skipped = {}, set(), 0  # (epoch_us, protocol, src, dst) -> notes in CSV order
     for row in rows:
         text = row.get(time_col) or ""
         tod = time_of_day_us(text)
@@ -164,5 +167,11 @@ def rows_to_marks(rows, columns, tz, default_date=None):
         dates.add(day)
         epoch_us = calendar.timegm(day.timetuple()) * 10**6 + tod - utc_offset_us(day, tod)
         proto = (row.get(proto_col) or "").strip() if proto_col else ""
-        marks.add((epoch_us, proto, _first_ip(row, src_cols), _first_ip(row, dst_cols)))
+        key = (epoch_us, proto, _first_ip(row, src_cols), _first_ip(row, dst_cols))
+        packet_notes = notes.setdefault(key, [])
+        # the label file is tab separated, one line per packet
+        note = " ".join((row.get(note_col) or "").split()) if note_col else ""
+        if note and note not in packet_notes:
+            packet_notes.append(note)
+    marks = {key + (" | ".join(n),) for key, n in notes.items()}
     return marks, dates, skipped
