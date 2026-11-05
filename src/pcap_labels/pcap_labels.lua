@@ -105,6 +105,24 @@ end
 
 function pcaplabel.init() load_all() end
 
+-- Wireshark cuts a tree line at about 240 characters: a longer note continues on more lines,
+-- broken after ", " or "; " where possible.
+local NOTE_LINE = 230
+
+local function add_note_lines(item, text)
+    while #text > NOTE_LINE do
+        -- the line ends at "last"; the rest starts at "from", past the space of the separator
+        local last, from = NOTE_LINE, NOTE_LINE + 1
+        for i = NOTE_LINE, 60, -1 do
+            local two = text:sub(i - 1, i)
+            if two == ", " or two == "; " then last, from = i - 1, i + 1; break end
+        end
+        item:add(f_note, text:sub(1, last))
+        text = "  ... " .. text:sub(from)
+    end
+    item:add(f_note, text)
+end
+
 function pcaplabel.dissector(tvb, pinfo, tree)
     if not pcaplabel.prefs.enabled then return end
     local entries = marks[math.floor(pinfo.abs_ts * 1e6 + 0.5)]
@@ -130,7 +148,13 @@ function pcaplabel.dissector(tvb, pinfo, tree)
                 count = count + 1
                 subtree = subtree or tree:add(pcaplabel, tvb())
                 local item = subtree:add(f_name, e.label)
-                if e.note ~= "" then item:add(f_note, e.note) end
+                -- notes of several rows for one packet arrive joined with " | ": one line each,
+                -- so a long note is not cut at Wireshark's line length
+                if e.note ~= "" then
+                    for part in (e.note .. " | "):gmatch("(.-) | ") do
+                        if part ~= "" then add_note_lines(item, part) end
+                    end
+                end
                 subtree:append_text((count == 1 and ": " or ", ") .. e.label)
             end
         end

@@ -150,7 +150,9 @@ Packet Label: poison-out_of_range
 
 - Filter on it: `pcaplabel.note contains "TMP120"`.
 - See it next to every packet: right-click the *Note* line and choose *Apply as Column*.
-- Several rows for the same packet in one label are merged into one note, separated by ` | `.
+- Several rows for the same packet in one label are stored as one note, separated by ` | `, and shown as one *Note* line each.
+- Wireshark cuts a line at about 240 characters, so a note longer than 230 characters continues on more *Note* lines that start with `  ... `. It is broken after `, ` or `; ` where possible.
+- Each *Note* line is a separate value: a filter does not find text that was split between two lines, and *Apply as Column* shows all the lines joined with commas.
 - Tabs and line breaks in a note are replaced by spaces. Label files from CSVs without notes are unchanged.
 
 Frame numbers are not used, because they restart at 1 in every split file.
